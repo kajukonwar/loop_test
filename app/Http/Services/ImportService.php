@@ -8,13 +8,20 @@ use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\Log;
 
-class CustomerService
+class ImportService
 {
+    private $type = null;
 
-    public function importToDb()
+    public function importToDb($type)
     {
-        if (empty(config('loop.data_source.url.customers'))) {
-            $msg = 'The URL to download the customers data is missing';
+        if (!in_array($type, ['customers', 'products'])) {
+            $msg = 'Invalid type';
+            $this->logAndThrowException($msg);
+        }
+        $this->type = $type;
+
+        if (empty(config('loop.data_source.url.'.$type))) {
+            $msg = 'The URL to download the '.$type.' data is missing';
             $this->logAndThrowException($msg);
         }
 
@@ -28,17 +35,17 @@ class CustomerService
             $this->logAndThrowException($msg);
         }
 
-        $url = config('loop.data_source.url.customers');
+        $url = config('loop.data_source.url.'.$type);
         $response = Http::withBasicAuth(config('loop.data_source.auth.username'), config('loop.data_source.auth.password'))->get($url);
         if (!$response->successful()) {
-            $msg = 'Customer data download request failed';
+            $msg = $type.' data download request failed';
             $this->logAndThrowException($msg);
         }
 
         $csv = $response->body();
-        Storage::put(config('loop.storage.path.customers'), $csv);
-        $tmp_path = storage_path('app/'.config('loop.storage.path.customers'));
-        Log::info('Customer data downloaded successfully and saved in '.$tmp_path);
+        Storage::put(config('loop.storage.path.'.$type), $csv);
+        $tmp_path = storage_path('app/'.config('loop.storage.path.'.$type));
+        Log::info($type.' data downloaded successfully and saved in '.$tmp_path);
         
         $imported_count = $this->processImport($tmp_path);
         unlink($tmp_path);
@@ -62,21 +69,18 @@ class CustomerService
               ->each(function (LazyCollection $chunk) use (&$record_count, &$iteration) {
                 $iteration++;
                 $records = $chunk->map(function ($row) {
-                    $date_added = Carbon::parse($row[4]);
-                    $date_added = $date_added->format('Y-m-d H:i:s');
-                    return [
-                        "id" => $row[0],
-                        "job_title" => $row[1],
-                        "email" => $row[2],
-                        "name" => $row[3],
-                        "phone" => $row[5],
-                        "date_added" => $date_added
-                    ];
+                   if ($this->type == 'customers') {
+                       return $this->prepareCustomerData($row);
+                   }
+
+                   if ($this->type == 'products') {
+                       return $this->prepareProductData($row);
+                   }
                 })->toArray();
                 
-                DB::table('customers')->insert($records);
+                DB::table($this->type)->insert($records);
                 $record_count = $record_count + count($records);
-                Log::info('Customer data inserted successfuly', ['records_imported' => count($records), 'iteration' => $iteration]);
+                Log::info($this->type.' data inserted successfuly', ['records_imported' => count($records), 'iteration' => $iteration]);
               });
 
               Log::info('Import Success', ['total_imported' => $record_count]);
@@ -91,5 +95,28 @@ class CustomerService
     {
         Log::error($msg);
         throw new Exception($msg);
+    }
+
+    private function prepareCustomerData($row)
+    {
+        $date_added = Carbon::parse($row[4]);
+        $date_added = $date_added->format('Y-m-d H:i:s');
+        return [
+            "id" => $row[0],
+            "job_title" => $row[1],
+            "email" => $row[2],
+            "name" => $row[3],
+            "phone" => $row[5],
+            "date_added" => $date_added
+        ];
+    }
+
+    private function prepareProductData($row)
+    {
+        return [
+            "id" => $row[0],
+            "product" => $row[1],
+            "price" => $row[2]
+        ];
     }
 }
