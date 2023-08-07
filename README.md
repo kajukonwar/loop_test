@@ -1,66 +1,91 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+## Prerequisites
+ - Make sure your php version is >= 8.1
+ - Make sure all dependencies for laravel setup is fulfilled 
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+ A Dockerfile is also present in repo which can be used to setup a container
 
-## About Laravel
+## How to setup?
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Please do the following
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+ - Clone the repo
+ - Run composer install command
+ - Create .env file. Sample .env-example file is present in the repo. Please fill the values according to your setup
+ - Run the command -- php artisan migrate:install
+ - Run the command -- php artisan migrate
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Import data
+ - Make sure the .env file has the necessary data filled
+ - Run the command -- php artisan app:import-data . Follow the instructions shown in the terminal to import customer and product data
 
-## Learning Laravel
+## Check the APIs
+Make sure that Accept: application/json header is sent
+Make sure that Content-type: application/json header is sent
+There is no authentication required
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+  ## Create new order: 
+   Sample curl attached below
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+    curl  -X POST \
+    'http://localhost:8080/api/orders' \
+    --header 'Accept: application/json' \
+    --header 'Content-Type: application/json' \
+    --data-raw '{
+        "user_email":"Harvey_Thornton4640@hourpy.biz"
+    }'
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains over 2000 video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+  ## View All orders
+   Sample curl attached below
 
-## Laravel Sponsors
+    curl  -X GET \
+    'http://localhost:8080/api/orders' \
+    --header 'Accept: application/json' \
+    --header 'Content-Type: application/json'
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the Laravel [Patreon page](https://patreon.com/taylorotwell).
+  ## View a single order
+    Sample curl attached below
 
-### Premium Partners
+    curl  -X GET \
+    'http://localhost:8080/api/orders/1' \
+    --header 'Accept: application/json' \
+    --header 'Content-Type: application/json'
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Cubet Techno Labs](https://cubettech.com)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[Many](https://www.many.co.uk)**
-- **[Webdock, Fast VPS Hosting](https://www.webdock.io/en)**
-- **[DevSquad](https://devsquad.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[OP.GG](https://op.gg)**
-- **[WebReinvent](https://webreinvent.com/?utm_source=laravel&utm_medium=github&utm_campaign=patreon-sponsors)**
-- **[Lendio](https://lendio.com)**
+  ## Update an order
+   
+    Sample curl attached below
 
-## Contributing
+    curl  -X PUT \
+    'http://localhost:8080/api/orders/1' \
+    --header 'Accept: application/json' \
+    --header 'Content-Type: application/json' \
+    --data-raw '{
+    "customer_id":2
+    }'
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+  ## Add an product to order
+    Sampple curl attached below
 
-## Code of Conduct
+    curl  -X POST \
+    'http://localhost:8080/api/orders/1/add' \
+    --header 'Accept: application/json' \
+    --header 'Content-Type: application/json' \
+    --data-raw '{
+    "product_id":2
+    }'
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+  ##  Make payment
+    Sample curl attached below
 
-## Security Vulnerabilities
+    curl  -X POST \
+    'http://localhost:8080/api/orders/1/pay' \
+    --header 'Accept: application/json' \
+    --header 'Content-Type: application/json'
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+  ## Delete Order
 
-## License
+    Sample curl attached below
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+     curl  -X DELETE \
+    'http://localhost:8080/api/orders/1' \
+    --header 'Accept: application/json' \
+    --header 'Content-Type: application/json'
