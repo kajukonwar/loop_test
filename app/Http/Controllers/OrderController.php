@@ -75,6 +75,9 @@ class OrderController extends Controller
         ]);
         $validator->stopOnFirstFailure();
         $validated = $validator->validated();
+        if (empty($validated)) {
+            return response()->json('Nothing to update! Please send payload. Accepted params are customer_id and is_paid');
+        }
         $order = Order::with('products')->find($id);
         if (empty($order)) {
             $validator->errors()->add(
