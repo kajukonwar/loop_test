@@ -12,6 +12,7 @@ use App\Http\Resources\OrderResource;
 use App\Http\Resources\OrderCollection;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use App\Contracts\PaymentProviderInterface;
 
 class OrderController extends Controller
 {
@@ -28,15 +29,18 @@ class OrderController extends Controller
         ]);
         
         $validated = $validator->validated();
-        $customer = Customer::where('email', $validated['user_email'])->first();
-        $validator->after(function ($validator) use($customer) {
-            if (empty($customer)) {
-                $validator->errors()->add(
-                    'user_email', 'Customer does not exist'
-                );
-            }
-        });
-         
+
+        if (!empty($validated['user_email'])) {
+            $customer = Customer::where('email', $validated['user_email'])->first();
+            $validator->after(function ($validator) use($customer) {
+                if (empty($customer)) {
+                    $validator->errors()->add(
+                        'user_email', 'Customer does not exist'
+                    );
+                }
+            });
+        }
+
         if ($validator->fails()) {
             return new JsonResponse([
                 'message' => 'Validation failed',
@@ -53,7 +57,10 @@ class OrderController extends Controller
 
     public function show($id)
     {
-        $order = Order::with('products')->findOrFail($id);
+        $order = Order::with('products')->find($id);
+        if (empty($order)) {
+            return response()->json(['order does not exist'], 404);
+        }
         return response()->json(new OrderResource($order));
     }
 
@@ -69,23 +76,23 @@ class OrderController extends Controller
         $validator->stopOnFirstFailure();
         $validated = $validator->validated();
         $order = Order::with('products')->find($id);
+        if (empty($order)) {
+            $validator->errors()->add(
+                'id', 'Order does not exist'
+            );
+            throw new ValidationException($validator);
+        }
+
+        if ($order->is_paid) {
+            $validator->errors()->add(
+                'id', 'Unable to update. Order is already marked as paid'
+            );
+            throw new ValidationException($validator);
+        }
+
         if (isset($validated['customer_id'])) {
             $customer = Customer::find($validated['customer_id']);
             $validator->after(function ($validator) use($order, $customer) {
-                if (empty($order)) {
-                    $validator->errors()->add(
-                        'id', 'Order does not exist'
-                    );
-                    throw new ValidationException($validator);
-                }
-
-                if ($order->is_paid) {
-                    $validator->errors()->add(
-                        'id', 'Unable to update. Order is already marked as paid'
-                    );
-                    throw new ValidationException($validator);
-                }
-
                 if (empty($customer)) {
                     $validator->errors()->add(
                         'customer_id', 'Customer does not exist'
@@ -128,37 +135,40 @@ class OrderController extends Controller
         
         $validated = $validator->validated();
         $order = Order::with('products')->find($id);
-        $product = Product::find($validated['product_id']);
-        
-        $validator->after(function ($validator) use($order, $product) {
-            if (empty($order)) {
-                $validator->errors()->add(
-                    'id', 'Order does not exist'
-                );
-                throw new ValidationException($validator);
-            }
 
-            if ($order->is_paid) {
-                $validator->errors()->add(
-                    'id', 'Unable to add new product to order. Order is already marked as paid'
-                );
-                throw new ValidationException($validator);
-            }
-
-            if (empty($product)) {
-                $validator->errors()->add(
-                    'product_id', 'Product does not exist'
-                );
-            }
-
-            if (OrderProduct::where('product_id', $product->id)->where('order_id', $order->id)->exists()) {
-                $validator->errors()->add(
-                    'product_id', 'This Product already exists in the order'
-                );
-                throw new ValidationException($validator);
-            }
-        });
-         
+        if (!empty($validated['product_id'])) {
+            $product = Product::find($validated['product_id']);
+            $validator->after(function ($validator) use($order, $product) {
+                if (empty($order)) {
+                    $validator->errors()->add(
+                        'id', 'Order does not exist'
+                    );
+                    throw new ValidationException($validator);
+                }
+    
+                if ($order->is_paid) {
+                    $validator->errors()->add(
+                        'id', 'Unable to add new product to order. Order is already marked as paid'
+                    );
+                    throw new ValidationException($validator);
+                }
+    
+                if (empty($product)) {
+                    $validator->errors()->add(
+                        'product_id', 'Product does not exist'
+                    );
+                    throw new ValidationException($validator);
+                }
+    
+                if (OrderProduct::where('product_id', $product->id)->where('order_id', $order->id)->exists()) {
+                    $validator->errors()->add(
+                        'product_id', 'This Product already exists in the order'
+                    );
+                    throw new ValidationException($validator);
+                }
+            });
+        }
+    
         if ($validator->fails()) {
             return new JsonResponse([
                 'message' => 'Validation failed',
@@ -166,8 +176,29 @@ class OrderController extends Controller
             ], 422);
         }
 
-        $order->products()->save($product);
+        $order->products()->attach($product, ['amount' => $product->price]);
+        $order->amount = OrderProduct::where('order_id', $order->id)->sum('amount');
+        $order->save();
+        
         $order->refresh();
         return response()->json(new OrderResource($order));
+    }
+
+    public function makePayment(Request $request, PaymentProviderInterface $super_pp, $id)
+    {
+        $order = Order::with('customer')->find($id);
+        if (empty($order)) {
+            return new JsonResponse([
+                'message' => 'Validation failed',
+                'errors' => 'Order does not exist',
+            ], 422);
+        }
+
+        if ($super_pp->pay($order->id, $order->customer->email, $order->amount)) {
+            $order->is_paid = 1;
+            $order->save();
+            return response()->json(['status' => 'success', 'message' => 'Payment success']);
+        }
+        return response()->json(['status' => 'error', 'message' => 'Payment failed']);
     }
 }

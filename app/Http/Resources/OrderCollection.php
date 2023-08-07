@@ -16,9 +16,6 @@ class OrderCollection extends ResourceCollection
     {
         return [
             'data' => $this->collection,
-            'links' => [
-                
-            ],
         ];
     }
 }

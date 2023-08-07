@@ -18,4 +18,5 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
 Route::post('orders/{id}/add', [OrderController::class, 'addNewProduct']);
+Route::post('orders/{id}/pay', [OrderController::class, 'makePayment']);
 Route::apiResource('orders', OrderController::class);
